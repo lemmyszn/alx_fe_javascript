@@ -1169,8 +1169,146 @@ function addStyles() {
                 min-width: 150px;
             }
         }
+        
+        .sync-button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin: 10px 0;
+        }
+        
+        .sync-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .sync-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .conflict-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        .conflict-dialog {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .conflict-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .conflict-header h3 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .btn-close {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+        
+        .conflict-content {
+            color: #2c3e50;
+        }
+        
+        .conflict-list {
+            margin-top: 15px;
+        }
+        
+        .conflict-item {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #e74c3c;
+        }
+        
+        .conflict-item h4 {
+            margin: 0 0 10px 0;
+            color: #e74c3c;
+        }
+        
+        .conflict-versions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .local-version {
+            background: #fff3cd;
+            padding: 8px;
+            border-radius: 3px;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .server-version {
+            background: #d1ecf1;
+            padding: 8px;
+            border-radius: 3px;
+            border-left: 3px solid #17a2b8;
+        }
     `;
     document.head.appendChild(style);
+}
+
+// Add sync button styles
+function addSyncStyles() {
+    const syncStyle = document.createElement('style');
+    syncStyle.textContent = `
+        .sync-button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin: 10px 0;
+        }
+        
+        .sync-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+    `;
+    document.head.appendChild(syncStyle);
 }
 
 // Function to update storage info display
@@ -1203,6 +1341,198 @@ function clearFilter() {
     showRandomQuote();
 }
 
+// Server Sync and Conflict Resolution Functions
+async function fetchQuotesFromServer() {
+    try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/posts');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const serverPosts = await response.json();
+        
+        // Map server data to our quote format
+        const serverQuotes = serverPosts.slice(0, 10).map((post, index) => ({
+            text: post.title,
+            category: `Server-${index + 1}`,
+            id: `server-${post.id}`,
+            source: 'server'
+        }));
+        
+        return serverQuotes;
+    } catch (error) {
+        console.error('Error fetching from server:', error);
+        showNotification('Failed to fetch data from server', 'error');
+        return [];
+    }
+}
+
+async function postQuotesToServer(localQuotes) {
+    try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
+            method: 'POST',
+            body: JSON.stringify({
+                title: 'Quote Sync',
+                body: JSON.stringify(localQuotes),
+                userId: 1
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Mock server response:', result);
+        return true;
+    } catch (error) {
+        console.error('Error posting to server:', error);
+        showNotification('Failed to sync with server', 'error');
+        return false;
+    }
+}
+
+async function syncWithServer() {
+    try {
+        showNotification('Syncing with server...', 'info');
+        
+        // Fetch quotes from server
+        const serverQuotes = await fetchQuotesFromServer();
+        
+        if (serverQuotes.length === 0) {
+            showNotification('No server data available', 'info');
+            return;
+        }
+        
+        // Get current local quotes
+        const localQuotes = [...quotes];
+        const originalCount = localQuotes.length;
+        
+        // Create a map of existing quotes by text for quick lookup
+        const existingQuotesMap = new Map();
+        localQuotes.forEach(quote => {
+            existingQuotesMap.set(quote.text, quote);
+        });
+        
+        // Merge server quotes with local quotes
+        let mergedQuotes = [...localQuotes];
+        let conflicts = [];
+        let newQuotes = [];
+        
+        serverQuotes.forEach(serverQuote => {
+            const existingQuote = existingQuotesMap.get(serverQuote.text);
+            
+            if (existingQuote) {
+                // Conflict detected - server takes precedence
+                if (existingQuote.source !== 'server') {
+                    conflicts.push({
+                        local: existingQuote,
+                        server: serverQuote
+                    });
+                }
+                // Replace with server version
+                const index = mergedQuotes.findIndex(q => q.text === serverQuote.text);
+                if (index !== -1) {
+                    mergedQuotes[index] = serverQuote;
+                }
+            } else {
+                // New quote from server
+                mergedQuotes.push(serverQuote);
+                newQuotes.push(serverQuote);
+            }
+        });
+        
+        // Update quotes array
+        quotes = mergedQuotes;
+        
+        // Save to local storage
+        saveQuotes();
+        
+        // Update UI
+        updateCategorySelector();
+        updateQuoteCounter();
+        populateCategories();
+        updateStorageInfo();
+        
+        // Show appropriate notifications
+        if (newQuotes.length > 0) {
+            showNotification(`Added ${newQuotes.length} new quotes from server`, 'success');
+        }
+        
+        if (conflicts.length > 0) {
+            showNotification(`Resolved ${conflicts.length} conflicts (server data took precedence)`, 'info');
+            saveSessionData('lastConflicts', conflicts);
+        }
+        
+        // Update display based on current filter
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter && categoryFilter.value !== 'all') {
+            filterQuotes();
+        } else {
+            showRandomQuote();
+        }
+        
+        console.log(`Sync completed: ${newQuotes.length} new quotes, ${conflicts.length} conflicts resolved`);
+        
+    } catch (error) {
+        console.error('Sync error:', error);
+        showNotification('Sync failed: ' + error.message, 'error');
+    }
+}
+
+function showConflictResolutionDialog(conflicts) {
+    const dialogHTML = `
+        <div class="conflict-dialog">
+            <div class="conflict-header">
+                <h3>Conflict Resolution</h3>
+                <button onclick="closeConflictDialog()" class="btn-close">×</button>
+            </div>
+            <div class="conflict-content">
+                <p>${conflicts.length} conflicts were detected. Server data was used by default.</p>
+                <div class="conflict-list">
+                    ${conflicts.map((conflict, index) => `
+                        <div class="conflict-item">
+                            <h4>Conflict ${index + 1}</h4>
+                            <div class="conflict-versions">
+                                <div class="local-version">
+                                    <strong>Local:</strong> "${conflict.local.text}" (${conflict.local.category})
+                                </div>
+                                <div class="server-version">
+                                    <strong>Server:</strong> "${conflict.server.text}" (${conflict.server.category})
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'conflict-overlay';
+    overlay.innerHTML = dialogHTML;
+    document.body.appendChild(overlay);
+}
+
+function closeConflictDialog() {
+    const overlay = document.querySelector('.conflict-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function startPeriodicSync() {
+    // Sync every 2 minutes (120000ms)
+    setInterval(async () => {
+        await syncWithServer();
+    }, 120000);
+    
+    console.log('Periodic sync started (every 2 minutes)');
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Load quotes from local storage
@@ -1229,6 +1559,12 @@ document.addEventListener('DOMContentLoaded', function() {
         showRandomQuote(categorySelect ? categorySelect.value : null);
     });
     
+    // Add event listener to sync button
+    const syncBtn = document.querySelector('button[onclick="syncWithServer()"]');
+    if (syncBtn) {
+        syncBtn.addEventListener('click', syncWithServer);
+    }
+    
     // Show initial content based on filter
     if (lastFilter && lastFilter !== 'all') {
         filterQuotes();
@@ -1245,6 +1581,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update storage info
     updateStorageInfo();
     
+    // Start periodic sync
+    startPeriodicSync();
+    
     // Add CSS styles dynamically
     addStyles();
+    addSyncStyles();
 });
