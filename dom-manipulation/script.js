@@ -33,6 +33,151 @@ function loadSessionData(key) {
     return data ? JSON.parse(data) : null;
 }
 
+// Filter and Category Management Functions
+function saveFilterPreference(category) {
+    localStorage.setItem('lastSelectedFilter', category);
+}
+
+function loadFilterPreference() {
+    return localStorage.getItem('lastSelectedFilter') || 'all';
+}
+
+function populateCategories() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (!categoryFilter) return;
+    
+    // Get current selection
+    const currentSelection = categoryFilter.value;
+    
+    // Clear existing options except "All Categories"
+    categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+    
+    // Get unique categories and add them to the dropdown
+    const categories = getCategories();
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryFilter.appendChild(option);
+    });
+    
+    // Restore previous selection if it still exists
+    if (currentSelection && categories.includes(currentSelection)) {
+        categoryFilter.value = currentSelection;
+    }
+}
+
+function filterQuotes() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
+    
+    // Save filter preference
+    saveFilterPreference(selectedCategory);
+    
+    // Filter quotes based on selection
+    let filteredQuotes = quotes;
+    if (selectedCategory && selectedCategory !== 'all') {
+        filteredQuotes = quotes.filter(quote => quote.category === selectedCategory);
+    }
+    
+    // Update the display
+    displayFilteredQuotes(filteredQuotes, selectedCategory);
+    
+    // Update session data
+    saveSessionData('lastFilteredCategory', selectedCategory);
+}
+
+function displayFilteredQuotes(filteredQuotes, category) {
+    const quoteDisplay = document.getElementById('quoteDisplay');
+    
+    if (filteredQuotes.length === 0) {
+        quoteDisplay.innerHTML = `
+            <div class="no-quotes-message">
+                <h3>No quotes found</h3>
+                <p>No quotes available for category: <strong>${category}</strong></p>
+                <button onclick="clearFilter()" class="btn-show-random">Clear Filter</button>
+            </div>
+        `;
+        return;
+    }
+    
+    // Create a container for all filtered quotes
+    let quotesHTML = `
+        <div class="filtered-quotes-container">
+            <div class="filter-header">
+                <h3>Quotes in "${category === 'all' ? 'All Categories' : category}" (${filteredQuotes.length})</h3>
+                <button onclick="clearFilter()" class="btn-clear-filter">Clear Filter</button>
+            </div>
+            <div class="quotes-grid">
+    `;
+    
+    // Add each quote to the display
+    filteredQuotes.forEach((quote, index) => {
+        quotesHTML += `
+            <div class="quote-card" data-index="${index}">
+                <blockquote class="quote-text">"${quote.text}"</blockquote>
+                <cite class="quote-category">— ${quote.category}</cite>
+                <div class="quote-actions">
+                    <button onclick="showSpecificQuote(${index})" class="btn-view-quote">View Full</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    quotesHTML += `
+            </div>
+        </div>
+    `;
+    
+    quoteDisplay.innerHTML = quotesHTML;
+    
+    // Add animation to quote cards
+    const quoteCards = quoteDisplay.querySelectorAll('.quote-card');
+    quoteCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease-in-out';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+}
+
+function showSpecificQuote(index) {
+    const categoryFilter = document.getElementById('categoryFilter');
+    const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
+    
+    let filteredQuotes = quotes;
+    if (selectedCategory && selectedCategory !== 'all') {
+        filteredQuotes = quotes.filter(quote => quote.category === selectedCategory);
+    }
+    
+    if (filteredQuotes[index]) {
+        const quote = filteredQuotes[index];
+        const quoteDisplay = document.getElementById('quoteDisplay');
+        
+        quoteDisplay.innerHTML = `
+            <div class="quote-container">
+                <blockquote class="quote-text">"${quote.text}"</blockquote>
+                <cite class="quote-category">— ${quote.category}</cite>
+                <div class="quote-actions">
+                    <button onclick="filterQuotes()" class="btn-back-to-filter">Back to Filtered View</button>
+                    <button onclick="showRandomQuote()" class="btn-show-random">Show Random Quote</button>
+                </div>
+            </div>
+        `;
+        
+        // Save to session storage
+        saveSessionData('lastViewedQuote', {
+            quote: quote,
+            category: selectedCategory,
+            timestamp: new Date().toISOString()
+        });
+    }
+}
+
 // Get unique categories from quotes array
 const getCategories = () => {
     const categories = [...new Set(quotes.map(quote => quote.category))];
@@ -176,6 +321,7 @@ function createAddQuoteForm() {
             updateCategorySelector();
             updateQuoteCounter();
             updateStorageInfo();
+            populateCategories();
             
             // Add animation to the success message
             const successMessage = quoteDisplay.querySelector('.success-message');
@@ -308,6 +454,7 @@ function addQuote() {
     updateCategorySelector();
     updateQuoteCounter();
     updateStorageInfo();
+    populateCategories();
     
     // Add animation to the success message
     const successMessage = quoteDisplay.querySelector('.success-message');
@@ -372,6 +519,7 @@ function importFromJsonFile(event) {
             updateCategorySelector();
             updateQuoteCounter();
             updateStorageInfo();
+            populateCategories();
             
             // Show success message
             showNotification(`Successfully imported ${importedQuotes.length} quotes!`, 'success');
@@ -849,6 +997,178 @@ function addStyles() {
                 opacity: 1;
             }
         }
+        
+        .filter-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(5px);
+            text-align: center;
+        }
+        
+        .filter-section label {
+            color: white;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        
+        #categoryFilter {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background: white;
+            font-size: 14px;
+            min-width: 200px;
+            cursor: pointer;
+        }
+        
+        #categoryFilter:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.5);
+        }
+        
+        .filtered-quotes-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .filter-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .filter-header h3 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 20px;
+        }
+        
+        .btn-clear-filter {
+            background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-clear-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .quotes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .quote-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .quote-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        
+        .quote-card .quote-text {
+            font-size: 16px;
+            font-style: italic;
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+        
+        .quote-card .quote-category {
+            font-size: 14px;
+            color: #7f8c8d;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 15px;
+        }
+        
+        .quote-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .btn-view-quote,
+        .btn-back-to-filter,
+        .btn-show-random {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-view-quote:hover,
+        .btn-back-to-filter:hover,
+        .btn-show-random:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .btn-back-to-filter {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+        
+        .btn-show-random {
+            background: linear-gradient(45deg, #11998e, #38ef7d);
+        }
+        
+        .no-quotes-message {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 40px 20px;
+        }
+        
+        .no-quotes-message h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .no-quotes-message p {
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .quotes-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-section {
+                padding: 15px;
+            }
+            
+            #categoryFilter {
+                min-width: 150px;
+            }
+        }
     `;
     document.head.appendChild(style);
 }
@@ -860,7 +1180,8 @@ function updateStorageInfo() {
     
     if (localStorageInfo) {
         const quoteCount = quotes.length;
-        localStorageInfo.textContent = `${quoteCount} quotes stored`;
+        const currentFilter = loadFilterPreference();
+        localStorageInfo.textContent = `${quoteCount} quotes stored | Filter: ${currentFilter}`;
     }
     
     if (sessionStorageInfo) {
@@ -873,6 +1194,15 @@ function updateStorageInfo() {
     }
 }
 
+function clearFilter() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) {
+        categoryFilter.value = 'all';
+    }
+    saveFilterPreference('all');
+    showRandomQuote();
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Load quotes from local storage
@@ -882,6 +1212,16 @@ document.addEventListener('DOMContentLoaded', function() {
     createUIElements();
     createCategorySelector();
     
+    // Set up filtering system
+    populateCategories();
+    
+    // Restore last selected filter
+    const lastFilter = loadFilterPreference();
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter && lastFilter) {
+        categoryFilter.value = lastFilter;
+    }
+    
     // Add event listener to new quote button
     const newQuoteBtn = document.getElementById('newQuote');
     newQuoteBtn.addEventListener('click', function() {
@@ -889,12 +1229,17 @@ document.addEventListener('DOMContentLoaded', function() {
         showRandomQuote(categorySelect ? categorySelect.value : null);
     });
     
-    // Show initial quote (try to show last viewed quote from session)
-    const lastViewedQuote = loadSessionData('lastViewedQuote');
-    if (lastViewedQuote && lastViewedQuote.quote) {
-        showLastViewedQuote();
+    // Show initial content based on filter
+    if (lastFilter && lastFilter !== 'all') {
+        filterQuotes();
     } else {
-        showRandomQuote();
+        // Show initial quote (try to show last viewed quote from session)
+        const lastViewedQuote = loadSessionData('lastViewedQuote');
+        if (lastViewedQuote && lastViewedQuote.quote) {
+            showLastViewedQuote();
+        } else {
+            showRandomQuote();
+        }
     }
     
     // Update storage info
