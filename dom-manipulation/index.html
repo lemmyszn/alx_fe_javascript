@@ -27,6 +27,27 @@
         <button onclick="addQuote()">Add Quote</button>
       </div>
     </div>
+    
+    <div class="import-export-section">
+      <h3>Import & Export Quotes</h3>
+      <div class="import-export-controls">
+        <div class="export-control">
+          <button onclick="exportToJson()" class="btn-export">Export Quotes to JSON</button>
+        </div>
+        <div class="import-control">
+          <label for="importFile" class="file-input-label">Import Quotes from JSON:</label>
+          <input type="file" id="importFile" accept=".json" onchange="importFromJsonFile(event)" />
+        </div>
+      </div>
+    </div>
+    
+    <div class="session-info">
+      <button onclick="showLastViewedQuote()" class="btn-last-quote">Show Last Viewed Quote</button>
+      <div class="storage-info">
+        <p>Local Storage: <span id="localStorageInfo">Loading...</span></p>
+        <p>Session Storage: <span id="sessionStorageInfo">Active</span></p>
+      </div>
+    </div>
   </main>
   
   <footer>
