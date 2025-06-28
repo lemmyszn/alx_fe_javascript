@@ -1533,6 +1533,11 @@ function startPeriodicSync() {
     console.log('Periodic sync started (every 2 minutes)');
 }
 
+// Function to sync quotes (wrapper for syncWithServer)
+function syncQuotes() {
+    return syncWithServer();
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Load quotes from local storage
