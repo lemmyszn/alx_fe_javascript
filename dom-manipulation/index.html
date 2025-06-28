@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Quote Generator</title>
+  <meta name="description" content="An interactive quote generator with dynamic DOM manipulation">
+</head>
+<body>
+  <header>
+    <h1>Dynamic Quote Generator</h1>
+    <p class="subtitle">Discover inspiring quotes and add your own!</p>
+  </header>
+  
+  <main>
+    <div id="quoteDisplay"></div>
+    
+    <div class="controls">
+      <button id="newQuote">Show New Quote</button>
+    </div>
+    
+    <div class="add-quote-section">
+      <h3>Add Your Own Quote</h3>
+      <div class="simple-form">
+        <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
+        <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
+        <button onclick="addQuote()">Add Quote</button>
+      </div>
+    </div>
+  </main>
+  
+  <footer>
+    <p>&copy; 2024 Dynamic Quote Generator - Advanced DOM Manipulation</p>
+  </footer>
+  
+  <script src="script.js"></script>
+</body>
+</html>
