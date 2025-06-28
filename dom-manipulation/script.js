@@ -1466,6 +1466,9 @@ async function syncWithServer() {
             saveSessionData('lastConflicts', conflicts);
         }
         
+        // Show general sync success message
+        showNotification('Quotes synced with server!', 'success');
+        
         // Update display based on current filter
         const categoryFilter = document.getElementById('categoryFilter');
         if (categoryFilter && categoryFilter.value !== 'all') {
